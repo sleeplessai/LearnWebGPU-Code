@@ -67,7 +67,7 @@ int main (int, char**) {
 	std::cout << "Requesting device..." << std::endl;
 	RequiredLimits requiredLimits = Default;
 	requiredLimits.limits.maxVertexAttributes = 2;
-	requiredLimits.limits.maxVertexBuffers = 1;
+	requiredLimits.limits.maxVertexBuffers = 2;
 
 	DeviceDescriptor deviceDesc{};
 	deviceDesc.label = "My Device";
@@ -162,27 +162,32 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 	// Vertex fetch
 	// We now have 2 attributes
-	std::vector<VertexAttribute> vertexAttribs(2);
+	std::vector<VertexBufferLayout> vertexBufferLayouts(2);
 
 	// Position attribute
-	vertexAttribs[0].shaderLocation = 0;
-	vertexAttribs[0].format = VertexFormat::Float32x2;
-	vertexAttribs[0].offset = 0;
+	VertexAttribute positionAttrib;
+	positionAttrib.shaderLocation = 0;
+	positionAttrib.format = VertexFormat::Float32x2;
+	positionAttrib.offset = 0;
 
-	// Color attribute
-	vertexAttribs[1].shaderLocation = 1;
-	vertexAttribs[1].format = VertexFormat::Float32x3; // different type!
-	vertexAttribs[1].offset = 2 * sizeof(float); // non null offset!
+	vertexBufferLayouts[0].attributeCount = 1;
+	vertexBufferLayouts[0].attributes = &positionAttrib;
+	vertexBufferLayouts[0].arrayStride = 2 * sizeof(float);
+	vertexBufferLayouts[0].stepMode = VertexStepMode::Vertex;
 
-	VertexBufferLayout vertexBufferLayout;
-	vertexBufferLayout.attributeCount = (uint32_t)vertexAttribs.size();
-	vertexBufferLayout.attributes = vertexAttribs.data();
-	// The new stride
-	vertexBufferLayout.arrayStride = 5 * sizeof(float);
-	vertexBufferLayout.stepMode = VertexStepMode::Vertex;
+	// Position attribute
+	VertexAttribute colorAttrib;
+	colorAttrib.shaderLocation = 1;
+	colorAttrib.format = VertexFormat::Float32x3;
+	colorAttrib.offset = 0;
 
-	pipelineDesc.vertex.bufferCount = 1;
-	pipelineDesc.vertex.buffers = &vertexBufferLayout;
+	vertexBufferLayouts[1].attributeCount = 1;
+	vertexBufferLayouts[1].attributes = &colorAttrib;
+	vertexBufferLayouts[1].arrayStride = 3 * sizeof(float);
+	vertexBufferLayouts[1].stepMode = VertexStepMode::Vertex;
+
+	pipelineDesc.vertex.bufferCount = static_cast<uint32_t>(vertexBufferLayouts.size());
+	pipelineDesc.vertex.buffers = vertexBufferLayouts.data();
 
 	pipelineDesc.vertex.module = shaderModule;
 	pipelineDesc.vertex.entryPoint = "vs_main";
@@ -233,34 +238,49 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	std::cout << "Render pipeline: " << pipeline << std::endl;
 
 	// Vertex buffer
-	// There are 2 floats per vertex, one for x and one for y.
-	// But in the end this is just a bunch of floats to the eyes of the GPU,
-	// the *layout* will tell how to interpret this.
-	std::vector<float> vertexData = {
-		// x0,  y0,  r0,  g0,  b0
-		-0.5, -0.5, 1.0, 0.0, 0.0,
+	std::vector<float> positionData = {
+		// x0,  y0,
+		-0.5, -0.5,
 
-		// x1,  y1,  r1,  g1,  b1
-		+0.5, -0.5, 0.0, 1.0, 0.0,
+		// x1,  y1,
+		+0.5, -0.5,
 
 		// ...
-		+0.0,   +0.5, 0.0, 0.0, 1.0,
-		-0.55f, -0.5, 1.0, 1.0, 0.0,
-		-0.05f, +0.5, 1.0, 0.0, 1.0,
-		-0.55f, +0.5, 0.0, 1.0, 1.0
+		+0.0,   +0.5,
+		-0.55f, -0.5,
+		-0.05f, +0.5,
+		-0.55f, +0.5
 	};
-	// We now divide the vector size by 5 fields.
-	int vertexCount = static_cast<int>(vertexData.size() / 5);
 
-	// Create vertex buffer
+	std::vector<float> colorData = {
+		// r0,  g0,  b0
+		  1.0, 0.0, 0.0,
+
+		  // r1,  g1,  b1
+			0.0, 1.0, 0.0,
+
+			// ...
+			0.0, 0.0, 1.0,
+			1.0, 1.0, 0.0,
+			1.0, 0.0, 1.0,
+			0.0, 1.0, 1.0
+	};
+
+	int vertexCount = static_cast<int>(positionData.size() / 2);
+	assert(vertexCount == static_cast<int>(colorData.size() / 3));
+
+	// Create vertex buffers
 	BufferDescriptor bufferDesc;
-	bufferDesc.size = vertexData.size() * sizeof(float);
 	bufferDesc.usage = BufferUsage::CopyDst | BufferUsage::Vertex;
 	bufferDesc.mappedAtCreation = false;
-	Buffer vertexBuffer = device.createBuffer(bufferDesc);
 
-	// Upload geometry data to the buffer
-	queue.writeBuffer(vertexBuffer, 0, vertexData.data(), bufferDesc.size);
+	bufferDesc.size = positionData.size() * sizeof(float);
+	Buffer positionBuffer = device.createBuffer(bufferDesc);
+	queue.writeBuffer(positionBuffer, 0, positionData.data(), bufferDesc.size);
+
+	bufferDesc.size = colorData.size() * sizeof(float);
+	Buffer colorBuffer = device.createBuffer(bufferDesc);
+	queue.writeBuffer(colorBuffer, 0, colorData.data(), bufferDesc.size);
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -293,8 +313,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 		renderPass.setPipeline(pipeline);
 
-		// Set vertex buffer while encoding the render pass
-		renderPass.setVertexBuffer(0, vertexBuffer, 0, vertexData.size() * sizeof(float));
+		// Set vertex buffers while encoding the render pass
+		renderPass.setVertexBuffer(0, positionBuffer, 0, positionData.size() * sizeof(float));
+		renderPass.setVertexBuffer(1, colorBuffer, 0, colorData.size() * sizeof(float));
 
 		// We use the `vertexCount` variable instead of hard-coding the vertex count
 		renderPass.draw(vertexCount, 1, 0, 0);
