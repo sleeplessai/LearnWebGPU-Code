@@ -28,11 +28,12 @@
 #include <GLFW/glfw3.h>
 
 #define WEBGPU_CPP_IMPLEMENTATION
-#include <webgpu.hpp>
-#include <wgpu.h> // wgpuTextureViewDrop
+#include <webgpu/webgpu.hpp>
 
 #include <iostream>
 #include <cassert>
+
+#include "webgpu-release.h"
 
 using namespace wgpu;
 
@@ -63,10 +64,18 @@ int main (int, char**) {
 	Adapter adapter = instance.requestAdapter(adapterOpts);
 	std::cout << "Got adapter: " << adapter << std::endl;
 
+	SupportedLimits supportedLimits;
+	adapter.getLimits(&supportedLimits);
+
 	std::cout << "Requesting device..." << std::endl;
 	RequiredLimits requiredLimits = Default;
 	requiredLimits.limits.maxVertexAttributes = 2;
 	requiredLimits.limits.maxVertexBuffers = 1;
+	requiredLimits.limits.maxBufferSize = 6 * 5 * sizeof(float);
+	requiredLimits.limits.maxVertexBufferArrayStride = 5 * sizeof(float);
+	requiredLimits.limits.minStorageBufferOffsetAlignment = supportedLimits.limits.minStorageBufferOffsetAlignment;
+	// Limit on the number of components that can be forwarded from vertex to fragment shader
+	requiredLimits.limits.maxInterStageShaderComponents = 3;
 
 	DeviceDescriptor deviceDesc{};
 	deviceDesc.label = "My Device";
@@ -77,26 +86,20 @@ int main (int, char**) {
 	std::cout << "Got device: " << device << std::endl;
 
 	// Add an error callback for more debug info
-	// (TODO: fix the callback in the webgpu.hpp wrapper)
-	auto myCallback = [](ErrorType type, char const* message) {
+	auto h = device.setUncapturedErrorCallback([](ErrorType type, char const* message) {
 		std::cout << "Device error: type " << type;
 		if (message) std::cout << " (message: " << message << ")";
 		std::cout << std::endl;
-	};
-	struct Context {
-		decltype(myCallback) theCallback;
-	};
-	Context ctx = { myCallback };
-	static auto cCallback = [](WGPUErrorType type, char const* message, void* userdata) -> void {
-		Context& ctx = *reinterpret_cast<Context*>(userdata);
-		ctx.theCallback(static_cast<ErrorType>(type), message);
-	};
-	wgpuDeviceSetUncapturedErrorCallback(device, cCallback, reinterpret_cast<void*>(&ctx));
+	});
 
 	Queue queue = device.getQueue();
 
 	std::cout << "Creating swapchain..." << std::endl;
+#ifdef WEBGPU_BACKEND_WGPU
 	TextureFormat swapChainFormat = surface.getPreferredFormat(adapter);
+#else
+	TextureFormat swapChainFormat = TextureFormat::BGRA8Unorm;
+#endif
 	SwapChainDescriptor swapChainDesc = {};
 	swapChainDesc.width = 640;
 	swapChainDesc.height = 480;
@@ -113,8 +116,8 @@ int main (int, char**) {
  * as input to the entry point of a shader.
  */
 struct VertexInput {
-	@location(0) position: vec2<f32>,
-	@location(1) color: vec3<f32>,
+	@location(0) position: vec2f,
+	@location(1) color: vec3f,
 };
 
 /**
@@ -123,36 +126,42 @@ struct VertexInput {
  * shader.
  */
 struct VertexOutput {
-	@builtin(position) position: vec4<f32>,
+	@builtin(position) position: vec4f,
 	// The location here does not refer to a vertex attribute, it just means
 	// that this field must be handled by the rasterizer.
 	// (It can also refer to another field of another struct that would be used
 	// as input to the fragment shader.)
-	@location(0) color: vec3<f32>,
+	@location(0) color: vec3f,
 };
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
 	var out: VertexOutput;
-	out.position = vec4<f32>(in.position, 0.0, 1.0);
+	out.position = vec4f(in.position, 0.0, 1.0);
 	out.color = in.color; // forward to the fragment shader
 	return out;
 }
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-	return vec4<f32>(in.color, 1.0);
+fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+	return vec4f(in.color, 1.0);
 }
 )";
 
-	ShaderModuleWGSLDescriptor shaderCodeDesc{};
+	ShaderModuleWGSLDescriptor shaderCodeDesc;
 	shaderCodeDesc.chain.next = nullptr;
 	shaderCodeDesc.chain.sType = SType::ShaderModuleWGSLDescriptor;
-	shaderCodeDesc.code = shaderSource;
-	ShaderModuleDescriptor shaderDesc{};
+	ShaderModuleDescriptor shaderDesc;
+	shaderDesc.nextInChain = &shaderCodeDesc.chain;
+
+#ifdef WEBGPU_BACKEND_WGPU
 	shaderDesc.hintCount = 0;
 	shaderDesc.hints = nullptr;
-	shaderDesc.nextInChain = &shaderCodeDesc.chain;
+	shaderCodeDesc.code = shaderSource;
+#else
+	shaderCodeDesc.source = shaderSource;
+#endif
+
 	ShaderModule shaderModule = device.createShaderModule(shaderDesc);
 	std::cout << "Shader module: " << shaderModule << std::endl;
 
@@ -300,7 +309,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 		renderPass.end();
 		
-		wgpuTextureViewDrop(nextTexture);
+		wgpuTextureViewRelease(nextTexture);
 
 		CommandBufferDescriptor cmdBufferDescriptor{};
 		cmdBufferDescriptor.label = "Command buffer";
@@ -310,6 +319,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 		swapChain.present();
 	}
 
+	wgpuSwapChainRelease(swapChain);
+	wgpuDeviceRelease(device);
+	wgpuAdapterRelease(adapter);
+	wgpuInstanceRelease(instance);
 	glfwDestroyWindow(window);
 	glfwTerminate();
 
