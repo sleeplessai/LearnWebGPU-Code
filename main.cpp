@@ -29,8 +29,10 @@
 #include <glfw3webgpu.h>
 #include <GLFW/glfw3.h>
 
-#include <webgpu.h>
-#include <wgpu.h> // wgpuTextureViewDrop
+#include <webgpu/webgpu.h>
+#ifdef WEBGPU_BACKEND_WGPU
+#include <webgpu/wgpu.h>
+#endif // WEBGPU_BACKEND_WGPU
 
 #include <iostream>
 #include <vector>
@@ -160,7 +162,7 @@ int main (int, char**) {
 		if (status != WGPUBufferMapAsyncStatus_Success) return;
 
 		// Get a pointer to wherever the driver mapped the GPU memory to the RAM
-		unsigned char* bufferData = (unsigned char*)wgpuBufferGetMappedRange(context->buffer, 0, 16);
+		unsigned char* bufferData = (unsigned char*)wgpuBufferGetConstMappedRange(context->buffer, 0, 16);
 
 		// Do stuff with bufferData
 		std::cout << "bufferData = [";
@@ -179,8 +181,14 @@ int main (int, char**) {
 
 	while (!glfwWindowShouldClose(window)) {
 		// Do nothing, this checks for ongoing asynchronous operations and call their callbacks if needed
-		// NB: Our wgpu-native backend provides a more explicit but non-standard wgpuDevicePoll(device) to do this.
+#ifdef WEBGPU_BACKEND_WGPU
+		// Non-standardized behavior: submit empty queue to flush callbacks
+		// (wgpu-native also has a wgpuDevicePoll but its API is more complex)
 		wgpuQueueSubmit(queue, 0, nullptr);
+#else
+		// Non-standard Dawn way
+		wgpuDeviceTick(device);
+#endif
 
 		// (This is the same idea, for the GLFW library callbacks)
 		glfwPollEvents();
