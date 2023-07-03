@@ -24,13 +24,11 @@
  * SOFTWARE.
  */
 
-#include "glfw3webgpu.h"
+#define WEBGPU_CPP_IMPLEMENTATION
+#include <webgpu/webgpu.hpp>
 
 #include <GLFW/glfw3.h>
-
-#define WEBGPU_CPP_IMPLEMENTATION
-#include <webgpu.hpp>
-#include <wgpu.h> // wgpuTextureViewDrop
+#include <glfw3webgpu.h>
 
 #include <iostream>
 #include <cassert>
@@ -322,7 +320,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 		renderPass.end();
 		
-		wgpuTextureViewDrop(nextTexture);
+		nextTexture.release();
 
 		CommandBufferDescriptor cmdBufferDescriptor{};
 		cmdBufferDescriptor.label = "Command buffer";
