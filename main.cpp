@@ -108,7 +108,7 @@ int main (int, char**) {
 
 	std::cout << "Configuring command queue..." << std::endl;
 
-	// Get the command queue, through which we send commands to the GPU
+	// Get the main and only command queue used to send instructions to the GPU
 	WGPUQueue queue = wgpuDeviceGetQueue(device);
 
 	// Add a callback for debugging when commands in the queue have been executed
