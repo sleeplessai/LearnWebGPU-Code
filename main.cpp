@@ -78,6 +78,8 @@ int main (int, char**) {
 	requiredLimits.limits.maxVertexBufferArrayStride = 2 * sizeof(float);
 	// This must be set even if we do not use storage buffers for now
 	requiredLimits.limits.minStorageBufferOffsetAlignment = supportedLimits.limits.minStorageBufferOffsetAlignment;
+	// This must be set even if we do not use uniform buffers for now
+	requiredLimits.limits.minUniformBufferOffsetAlignment = supportedLimits.limits.minUniformBufferOffsetAlignment;
 
 	DeviceDescriptor deviceDesc;
 	deviceDesc.label = "My Device";
