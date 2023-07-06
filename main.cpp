@@ -180,11 +180,12 @@ int main (int, char**) {
 	glfwTerminate();
 
 	// Free GPU memory
-	wgpuSurfaceRelease(surface);
+	surface.release();
 	buffer1.destroy();
 	buffer2.destroy();
-	wgpuBufferRelease(buffer1);
-	wgpuBufferRelease(buffer2);
+
+	buffer1.release();
+	buffer2.release();
 
 	return 0;
 }
