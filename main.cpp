@@ -72,6 +72,7 @@ int main (int, char**) {
 	requiredLimits.limits.maxBufferSize = 6 * 5 * sizeof(float);
 	requiredLimits.limits.maxVertexBufferArrayStride = 5 * sizeof(float);
 	requiredLimits.limits.minStorageBufferOffsetAlignment = supportedLimits.limits.minStorageBufferOffsetAlignment;
+	requiredLimits.limits.minUniformBufferOffsetAlignment = supportedLimits.limits.minUniformBufferOffsetAlignment;
 	// Limit on the number of components that can be forwarded from vertex to fragment shader
 	requiredLimits.limits.maxInterStageShaderComponents = 3;
 
