@@ -145,15 +145,12 @@ fn fs_main() -> @location(0) vec4f {
 	ShaderModuleWGSLDescriptor shaderCodeDesc;
 	shaderCodeDesc.chain.next = nullptr;
 	shaderCodeDesc.chain.sType = SType::ShaderModuleWGSLDescriptor;
+	shaderCodeDesc.code = shaderSource;
 	ShaderModuleDescriptor shaderDesc;
 	shaderDesc.nextInChain = &shaderCodeDesc.chain;
-
 #ifdef WEBGPU_BACKEND_WGPU
 	shaderDesc.hintCount = 0;
 	shaderDesc.hints = nullptr;
-	shaderCodeDesc.code = shaderSource;
-#else
-	shaderCodeDesc.source = shaderSource;
 #endif
 	
 	ShaderModule shaderModule = device.createShaderModule(shaderDesc);
