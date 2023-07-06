@@ -269,7 +269,7 @@ fn fs_main() -> @location(0) vec4f {
 		
 		RenderPassDescriptor renderPassDesc;
 
-		WGPURenderPassColorAttachment renderPassColorAttachment;
+		RenderPassColorAttachment renderPassColorAttachment;
 		renderPassColorAttachment.view = nextTexture;
 		renderPassColorAttachment.resolveTarget = nullptr;
 		renderPassColorAttachment.loadOp = LoadOp::Clear;
