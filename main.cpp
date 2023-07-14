@@ -235,7 +235,6 @@ fn fs_main() -> @location(0) vec4f {
 		renderPassDesc.nextInChain = nullptr;
 
 		WGPURenderPassColorAttachment renderPassColorAttachment = {};
-		renderPassColorAttachment.nextInChain = nullptr;
 		renderPassColorAttachment.view = nextTexture;
 		renderPassColorAttachment.resolveTarget = nullptr;
 		renderPassColorAttachment.loadOp = WGPULoadOp_Clear;
