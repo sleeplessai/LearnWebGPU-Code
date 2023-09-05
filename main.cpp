@@ -251,7 +251,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 
 	// Create index buffer
 	// (we reuse the bufferDesc initialized for the vertexBuffer)
-	bufferDesc.size = indexData.size() * sizeof(float);
+	bufferDesc.size = indexData.size() * sizeof(uint16_t);
 	bufferDesc.usage = BufferUsage::CopyDst | BufferUsage::Index;
 	bufferDesc.mappedAtCreation = false;
 	Buffer indexBuffer = device.createBuffer(bufferDesc);
